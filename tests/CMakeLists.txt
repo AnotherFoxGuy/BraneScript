@@ -3,7 +3,7 @@ find_package(GTest)
 enable_testing()
 
 add_executable(bs_tests emptyPlaceholder.cpp)
-#target_link_libraries(bs_tests PUBLIC GTest::gtest_main BraneScriptCompiler)
+target_link_libraries(bs_tests PUBLIC GTest::gtest_main compiler)
 target_compile_definitions(bs_tests PUBLIC TESTS)
 
 include(GoogleTest)

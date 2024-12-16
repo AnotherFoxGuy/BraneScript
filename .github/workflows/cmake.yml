@@ -1,0 +1,97 @@
+name: CMake
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "Main" ]
+
+jobs:
+  build-gcc:
+    name: Linux build on Ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Cache conan
+        uses: actions/cache@v4
+        with:
+          key: conan-ubuntu-${{ hashFiles('conanfile.py') }}
+          path: ~/.conan2/
+
+      - name: Install dependencies
+        run: |
+          curl "https://raw.githubusercontent.com/AnotherFoxGuy/ci-scripts/main/install-conan.sh" | sudo bash
+          sudo apt-get update
+          sudo apt-get -y install \
+                  pkg-config \
+                  ninja-build
+
+        shell: bash
+
+      - name: Configure
+        run: |
+          conan profile detect --force
+          echo "tools.system.package_manager:mode = install" > ~/.conan2/global.conf
+          echo "tools.system.package_manager:sudo = True" >> ~/.conan2/global.conf
+          conan install . -s build_type=Release -b missing -pr:b=default -c tools.cmake.cmaketoolchain:generator="Ninja"
+          cmake --preset conan-release
+        shell: bash
+
+      - name: Build
+        run: ninja
+        shell: bash  
+        
+      - name: Test
+        run: ninja test
+        shell: bash
+
+      - name: Clean Conan pkgs
+        run: conan cache clean "*" -sbd
+        shell: bash
+
+  build-msvc:
+    name: Windows build
+    runs-on: windows-latest
+    env:
+      CONAN_PATH: C:\Program Files\Conan\conan\
+      CONAN_USER_HOME_SHORT: None
+    steps:
+      - run: echo $env:CONAN_PATH | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Build tools
+        run: choco install conan ninja -y
+        shell: cmd
+
+      - name: Cache conan packages
+        uses: actions/cache@v4
+        with:
+          key: conan-windows-${{ hashFiles('conanfile.py') }}
+          path: ~/.conan2
+
+      - name: Enable Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        run: |
+          conan install . -b missing -pr:b=tools/conan-profiles/vs-22-release-ninja -pr=tools/conan-profiles/vs-22-release-ninja
+          cmake --preset conan-release
+        shell: cmd
+
+      - name: Build
+        run: ninja
+        shell: cmd
+
+      - name: Test
+        run: ninja test
+        shell: cmd
+
+      - name: Clean Conan pkgs
+        run: conan cache clean "*" -sbd
+        shell: cmd
